@@ -35,7 +35,7 @@ task buildClientJar(type: Jar) {
     with jar
 }
 
-task buildDaemonJar(type: Jar) {
+task buildNodeJar(type: Jar) {
     manifest {
         attributes 'Main-Class': 'proxy.Daemon'
     }
