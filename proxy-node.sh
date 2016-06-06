@@ -1,6 +1,6 @@
 #!/bin/sh
 SERVICE_NAME="Proxy cache"
-PATH_TO_JAR=build/libs/proxy-cache-daemon-0.1.0.jar
+PATH_TO_JAR=build/libs/proxy-cache-node-0.1.0.jar
 PID_PATH_NAME=build/tmp/proxy-cache-pid
 PORT=3000
 case $1 in

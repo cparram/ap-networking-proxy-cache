@@ -37,9 +37,9 @@ task buildClientJar(type: Jar) {
 
 task buildNodeJar(type: Jar) {
     manifest {
-        attributes 'Main-Class': 'proxy.Daemon'
+        attributes 'Main-Class': 'proxy.Node'
     }
-    appendix = 'daemon'
+    appendix = 'node'
     from sourceSets.node.output
     from {
         configurations.nodeCompile.collect {

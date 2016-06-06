@@ -11,7 +11,7 @@ import java.net.Socket;
 /**
  * Created by cesar on 06-06-16.
  */
-public class Daemon {
+public class Node {
 
     @Option(name = "--port", usage = "listening port", required = true)
     private int port;
@@ -19,7 +19,7 @@ public class Daemon {
     private String path;
 
     public static void main(String[] args) {
-        Daemon server = new Daemon();
+        Node server = new Node();
 
         if (server.config(args)) {
             server.listen();
