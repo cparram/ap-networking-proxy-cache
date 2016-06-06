@@ -1,5 +1,4 @@
-# ap-networking-proxy-cache
-Proxy cache implementation
+[![Build Status](https://travis-ci.org/cparram/ap-networking-proxy-cache.svg?branch=staging)](https://travis-ci.org/cparram/ap-networking-proxy-cache)
 
 # ap-networking-proxy-cache
 Proxy cache implementation
