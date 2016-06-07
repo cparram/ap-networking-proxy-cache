@@ -1,6 +1,7 @@
 package proxy;
 
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
@@ -11,13 +12,13 @@ public class MasterRequest extends Thread {
     private final int portMaster;
     private final String ipMaster;
     private final String path;
-    private final int porProxyMaster;
+    private final int portProxyMaster;
 
     public MasterRequest(int portMaster, String ipMaster, String path, int portProxyMaster) {
         this.portMaster = portMaster;
         this.ipMaster = ipMaster;
         this.path = path;
-        this.porProxyMaster = portProxyMaster;
+        this.portProxyMaster = portProxyMaster;
     }
 
     @Override
@@ -28,11 +29,33 @@ public class MasterRequest extends Thread {
             DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
             BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            sendToMaster("SINCRONIZE", outStream);
+            send("SYNC", outStream);
             receiveListFile(inStream);
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+        try {
+            ServerSocket serverSocket = new ServerSocket(portProxyMaster);
+            while(true) {
+                Socket socket = serverSocket.accept();
+                System.out.println("Socket accepted on proxy from master");
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                String masterMsg = receive(input);
+                if (masterMsg.equals("SYNC")) {
+                    System.out.println("Master wants sync");
+                    receiveListFile(input);
+                    send("OK", output);
+                } else {
+                    System.out.println("Invalid message: '" + masterMsg + "' received from master");
+                }
+                socket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(-1);
         }
     }
 
@@ -49,12 +72,12 @@ public class MasterRequest extends Thread {
             }
         }
         // try create a file with all files on master
-        String proxyMsg = getMasterMsg(inStream);
+        String proxyMsg = receive(inStream);
         try {
             FileOutputStream outputStream = new FileOutputStream(path + ".config/master_files.txt");
             while(!proxyMsg.equals("OK")) {
                 outputStream.write((proxyMsg + "\n").getBytes());
-                proxyMsg = getMasterMsg(inStream);
+                proxyMsg = receive(inStream);
             }
             System.out.println("Proxy synchronization ok");
             outputStream.close();
@@ -69,7 +92,7 @@ public class MasterRequest extends Thread {
      * @param msg String message that will be sent.
      * @param outStream Output stream
      */
-    private void sendToMaster(String msg, DataOutputStream outStream) {
+    private void send(String msg, DataOutputStream outStream) {
         try {
             outStream.writeBytes(msg + "\n");
         } catch (IOException e) {
@@ -84,7 +107,7 @@ public class MasterRequest extends Thread {
      * @param inStream Input
      * @return String message from server
      */
-    private String getMasterMsg(BufferedReader inStream) {
+    private String receive(BufferedReader inStream) {
         String response = "";
         try {
             response = inStream.readLine();

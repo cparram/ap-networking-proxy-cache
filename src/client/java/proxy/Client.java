@@ -38,41 +38,56 @@ public class Client {
             DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
             BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             if (command.equals("LIST")){
-                sendToProxyServer(command , outStream);
+                send(command , outStream);
                 receiveListFile(inStream);
             } else {
-                sendToProxyServer(command + " " + fileName , outStream);
                 if (command.equals("GET")){
-                    receiveFileFromProxy(inStream);
+                    send(command + " " + fileName , outStream);
+                    receive(inStream);
                 } else if (command.equals("PUT")) {
-                    sendFileToProxy(fileName, outStream, inStream);
-                    System.out.println(getProxyServerMsg(inStream));
+                    if (existsFile(fileName)) {
+                        send(command + " " + fileName , outStream);
+                        sendFile(fileName, outStream, inStream);
+                    } else {
+                        System.out.println(fileName + " doesn't exists");
+                    }
                 } else if (command.equals("DELETE")){
                     System.out.println(getProxyServerMsg(inStream));
                 }
             }
+            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
     }
 
-    private void sendFileToProxy(String fileName, DataOutputStream outStream, BufferedReader inStream) {
+    private boolean existsFile(String fileName) {
+        File file = new File(fileName);
+        return file.exists();
+    }
+
+    private void sendFile(String fileName, DataOutputStream outStream, BufferedReader inStream) {
         FileInputStream clientFile;
         String proxyMsg = getProxyServerMsg(inStream);
         if (proxyMsg.equals("FYE")) { // if response of proxy is: File Yet Exists
-            System.out.println(proxyMsg);
+            System.out.println(fileName + " already exists on server");
             return;
         } else if (proxyMsg.equals("FNE")) { // only put a file if not exists
             try {
                 clientFile = new FileInputStream(fileName);
                 byte[] buffer = new byte[1024];
                 while (clientFile.read(buffer) != -1) {
-                    sendToProxyServer(new String(buffer), outStream);
+                    send(new String(buffer), outStream);
                 }
-                sendToProxyServer("EOF", outStream);
+                send("EOF", outStream);
                 clientFile.close();
-
+                proxyMsg = getProxyServerMsg(inStream);
+                if (proxyMsg.equals("OK")) {
+                    System.out.println(fileName + " correctly put on server");
+                } else {
+                    System.out.println(fileName + " doesn't put on server");
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -83,7 +98,7 @@ public class Client {
      * Gets file from proxy server
      * @param inStream
      */
-    private void receiveFileFromProxy(BufferedReader inStream) {
+    private void receive(BufferedReader inStream) {
         String proxyMsg = getProxyServerMsg(inStream);
         FileOutputStream outputStream;
         if (proxyMsg.equals("FNE")) { // if response of proxy is: File Not Exists
@@ -120,7 +135,7 @@ public class Client {
      * @param msg String message that will be sent.
      * @param outStream Output stream
      */
-    private void sendToProxyServer(String msg, DataOutputStream outStream) {
+    private void send(String msg, DataOutputStream outStream) {
         try {
             outStream.writeBytes(msg + "\n");
         } catch (IOException e) {
