@@ -49,13 +49,42 @@ public class MasterRequest extends Thread {
                     receiveListFile(input);
                     send("OK", output);
                 } else {
-                    System.out.println("Invalid message: '" + masterMsg + "' received from master");
+                    String action = masterMsg.split(" ")[0];
+                    String fileName = masterMsg.split(" ")[1];
+                    if (action.equals("DELETE")) {
+                        if (fileExists(fileName)) {
+                            if (deleteFile(fileName)) {
+                                send("OK", output);
+                            } else {
+                                send("FAIL", output);
+                            }
+                        } else {
+                            send("FNE", output);
+                        }
+                    } else
+                        System.out.println("Invalid message: '" + masterMsg + "' received from master");
                 }
                 socket.close();
             }
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
+        }
+    }
+
+    private boolean deleteFile(String fileName) {
+        File file = new File(path + fileName);
+        return file.delete();
+    }
+
+    private boolean fileExists(String fileName) {
+        File file = new File(path + fileName);
+        if (file.exists()) {
+            System.out.println(fileName + " exists on proxy server");
+            return true;
+        } else {
+            System.out.println(fileName + " doesn't exists on proxy server");
+            return false;
         }
     }
 

@@ -51,8 +51,14 @@ public class Client {
                     } else {
                         System.out.println(fileName + " doesn't exists");
                     }
-                } else if (command.equals("DELETE")){
-                    System.out.println(getProxyServerMsg(inStream));
+                } else if (command.equals("DELETE")) {
+                    send(command + " " + fileName, outStream);
+                    String proxyMsg = getProxyServerMsg(inStream);
+                    if (proxyMsg.equals("FNE")) {
+                        System.out.println(fileName + " doesn't exist on server");
+                    } else if (proxyMsg.equals("OK")) {
+                        System.out.println(fileName + " deleted");
+                    }
                 }
             }
             socket.close();

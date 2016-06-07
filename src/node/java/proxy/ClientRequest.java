@@ -72,12 +72,17 @@ public class ClientRequest extends Thread {
                             }
 
                         }
+                    } else if (action.equals("DELETE")) {
+                        if (fileExistsOnConfig(fileName)) {
+                            if (removeMasterFile(fileName)) {
+                                send("OK", output);
+                            } else {
+                                send("FAIL", output);
+                            }
+                        } else {
+                            send("FNE", output);
+                        }
                     }
-                    // // ToDo: implement other responses
-                    // else if (action.equals("DELETE")) {
-                    //    if (fileExists(fileName))
-                    //        removeMasterFile(fileName);
-                    // }
                 }
                 socket.close();
             }
@@ -85,6 +90,26 @@ public class ClientRequest extends Thread {
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+
+    private boolean removeMasterFile(String fileName) {
+        try {
+            Socket socket = new Socket(ipMaster, portMaster);
+            DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+            BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            send("DELETE " + fileName, outStream);
+            String masterMsg = receive(inStream);
+            socket.close();
+
+            if (masterMsg.equals("FNE")) { // if response of master is: File Not Exists
+                System.out.println(fileName + " not exists on master");
+                return false;
+            } else if (masterMsg.equals("OK"))
+                return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     private boolean sendFileToMaster(String fileName) {

@@ -68,8 +68,22 @@ public class Master {
                                 send("FAIL", output);
                             }
                         }
+                    } else if (action.equals("DELETE")) {
+                        if(fileExists(fileName)) {
+                            if(deleteFile(fileName)){
+                                if (cascadeDeletion(fileName) && updateProxysFiles()){
+                                    send("OK", output);
+                                } else {
+                                    send("FAIL", output);
+                                }
+                            } else {
+                                send("FAIL", output);
+                            }
+                        } else {
+                            send("FNE", output);
+                        }
                     }
-                    // ToDo: implement other responses
+
                 }
                 socket.close();
             }
@@ -77,6 +91,34 @@ public class Master {
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+
+    private boolean cascadeDeletion(String fileName) {
+        String ipsFilePath = path + ".config/ips.txt";
+        try {
+            // Note that we read the entire file assuming it will not be too big
+            List<String> proxys = Files.readAllLines(Paths.get(ipsFilePath), Charset.forName("UTF-8"));
+            for (String ip : proxys) {
+                Socket socket = new Socket(ip, portProxyMaster);
+                DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+                BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                send("DELETE " + fileName, outStream);
+                String proxyMsg = receive(inStream);
+                socket.close();
+                if (proxyMsg.equals("FAIL")){
+                    return false;
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private boolean deleteFile(String fileName) {
+        File file = new File(path + fileName);
+        return file.delete();
     }
 
     private boolean updateProxysFiles() {
