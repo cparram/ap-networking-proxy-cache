@@ -19,6 +19,7 @@ repositories {
 dependencies {
     clientCompile group: 'args4j', name: 'args4j', version:'2.33'
     nodeCompile group: 'args4j', name: 'args4j', version:'2.33'
+    masterCompile group: 'args4j', name: 'args4j', version:'2.33'
 }
 
 task buildClientJar(type: Jar) {
@@ -43,6 +44,20 @@ task buildNodeJar(type: Jar) {
     from sourceSets.node.output
     from {
         configurations.nodeCompile.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+    with jar
+}
+
+task buildMasterJar(type: Jar) {
+    manifest {
+        attributes 'Main-Class': 'proxy.Master'
+    }
+    appendix = 'master'
+    from sourceSets.master.output
+    from {
+        configurations.masterCompile.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
