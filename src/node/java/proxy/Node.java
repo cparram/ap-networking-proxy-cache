@@ -4,138 +4,45 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
-import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
-
 /**
  * Created by cesar on 06-06-16.
  */
 public class Node {
 
-    @Option(name = "--port", usage = "listening port", required = true)
-    private int port;
+    @Option(name = "--port-proxy-client", usage = "listening proxy's port to client", required = true)
+    private int portProxyClient;
+    @Option(name = "--port-proxy-master", usage = "listening proxy's port to master", required = true)
+    private int portProxyMaster;
+    @Option(name = "--port-master", usage = "listening master's port to proxys", required = true)
+    private int portMaster;
+    @Option(name = "--ip-master", usage = "Master's ip", required = true)
+    private String ipMaster;
     @Option(name = "--path", usage = "Path to files", required = true)
     private String path;
 
     public static void main(String[] args) {
-        Node server = new Node();
+        Node node = new Node();
 
-        if (server.config(args)) {
-            server.listen();
-        }
-    }
-
-    private void listen() {
-        try {
-            ServerSocket serverSocket = new ServerSocket(port);
-            while(true) {
-                Socket socket = serverSocket.accept();
-                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-                BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                String clientMsg = getClientMsg(input);
-                if (clientMsg.equals("LIST")) {
-                    sendListFilesToClient(output);
-                } else {
-                    String action = clientMsg.split(" ")[0];
-                    String fileName = clientMsg.split(" ")[1];
-                    if (action.equals("GET")) {
-                        if (fileExists(fileName))
-                            sendFileToClient(fileName, output);
-                        else {
-                            // ToDo: get file from master
-                            // and response to client
-                            sendToClient("FNE", output);
-                        }
-                    }
-                    // ToDo: implement other responses
-                    // else if (action.equals("PUT")) {
-                    //    if (!fileExists(fileName)) {
-                    //        sendToClient("FNE", output);
-                    //        receiveFile(fileName, input);
-                    //        sendFileToMaster(fileName);
-                    //    } else {
-                    //        sendToClient("FYE", output);
-                    //    }
-                    // } else if (action.equals("DELETE")) {
-                    //    if (fileExists(fileName))
-                    //        removeMasterFile(fileName);
-                    // }
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-    }
-
-    private void sendFileToClient(String fileName, DataOutputStream output) {
-        FileInputStream serverFile;
-        try {
-            serverFile = new FileInputStream(path + fileName);
-            byte[] buffer = new byte[1024];
-            while (serverFile.read(buffer) != -1) {
-                sendToClient(new String(buffer), output);
-            }
-            sendToClient("EOF", output);
-            serverFile.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (node.config(args)) {
+            node.listenClientRequests();
+            node.sinchronizeAndListenMaster();
         }
     }
 
     /**
-     * Sends to client a list of files
-     * @param output
+     * Brings the list of files that the master have
      */
-    private void sendListFilesToClient(DataOutputStream output) {
-        File folder = new File(path);
-        for (File fileEntry : folder.listFiles()) {
-            sendToClient(fileEntry.getName(), output);
-        }
-        sendToClient("OK", output);
+    private void sinchronizeAndListenMaster() {
+        (new MasterRequest(portMaster, ipMaster, path, portProxyMaster)).start();
     }
 
     /**
-     * Checks if a file exists or not.
-     * @param fileName
-     * @return
+     * Creates a thread that listen requests from client.
      */
-    private boolean fileExists(String fileName) {
-        File file = new File(path + fileName);
-        return file.exists();
+    private void listenClientRequests() {
+        (new ClientRequest(portProxyClient, path)).start();
     }
 
-    /**
-     * Sends messages to client.
-     *
-     * @param msg    Message that will be sent
-     * @param output Data output stream
-     */
-    private void sendToClient(String msg, DataOutputStream output) {
-        try {
-            output.writeBytes(msg + "\n");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Gets client message. It will wait until client sends a message
-     *
-     * @param input Reader
-     * @return String message from client
-     */
-    private String getClientMsg(BufferedReader input) {
-        String msg = "";
-        try {
-            msg = input.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return msg;
-    }
 
     private boolean config(String[] args) {
         boolean configured = false;
