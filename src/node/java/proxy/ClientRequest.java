@@ -34,7 +34,8 @@ public class ClientRequest extends Thread {
                 Socket socket = serverSocket.accept();
                 DataOutputStream output = new DataOutputStream(socket.getOutputStream());
                 BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                String clientMsg = getClientMsg(input);
+                String clientMsg = receive(input);
+                System.out.println("Message from client: '" + clientMsg +"'");
                 if (clientMsg.equals("LIST")) {
                     sendListFilesToClient(output);
                 } else {
@@ -42,36 +43,92 @@ public class ClientRequest extends Thread {
                     String fileName = clientMsg.split(" ")[1];
                     if (action.equals("GET")) {
                         if (fileExists(fileName))
-                            sendFileToClient(fileName, output);
-                        else if (fileExistsOnMaster(fileName)) {
+                            sendFile(fileName, output);
+                        else if (fileExistsOnConfig(fileName)) {
                             if (getFileFromMaster(fileName)){
-                                sendFileToClient(fileName, output);
+                                sendFile(fileName, output);
                             } else {
                                 removeFileName(fileName);
-                                sendToClient("FNE", output);
+                                send("FNE", output);
                             }
                         } else
-                            sendToClient("FNE", output);
+                            send("FNE", output);
+                    } else if (action.equals("PUT")) {
+                        if (fileExists(fileName)) {
+                            send("FYE", output);
+                        } else if (fileExistsOnConfig(fileName)) {
+                            // anomal case
+                            send("FYE", output);
+                        } else {
+                            send("FNE", output);
+                            if (receiveFile(fileName, input)) {
+                                if (sendFileToMaster(fileName)) {
+                                    send("OK", output);
+                                } else {
+                                    send("FAIL", output);
+                                }
+                            } else {
+                                send("FAIL", output);
+                            }
+
+                        }
                     }
-                    // ToDo: implement other responses
-                    // else if (action.equals("PUT")) {
-                    //    if (!fileExists(fileName)) {
-                    //        sendToClient("FNE", output);
-                    //        receiveFile(fileName, input);
-                    //        sendFileToMaster(fileName);
-                    //    } else {
-                    //        sendToClient("FYE", output);
-                    //    }
-                    // } else if (action.equals("DELETE")) {
+                    // // ToDo: implement other responses
+                    // else if (action.equals("DELETE")) {
                     //    if (fileExists(fileName))
                     //        removeMasterFile(fileName);
                     // }
                 }
+                socket.close();
             }
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+
+    private boolean sendFileToMaster(String fileName) {
+        try {
+            Socket socket = new Socket(ipMaster, portMaster);
+            DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+            BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            send("PUT " + fileName, outStream);
+            String masterMsg = receive(inStream);
+
+            if (masterMsg.equals("FYE")) { // if response of master is: File Not Exists
+                System.out.println(fileName + " already exists on master");
+                socket.close();
+                return false;
+            }
+            sendFile(fileName, outStream);
+            masterMsg = receive(inStream);
+            socket.close();
+
+            if (masterMsg.equals("OK")) {
+                return true;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+
+    }
+
+    private boolean receiveFile(String fileName, BufferedReader input) {
+        try {
+            String clientMsg = receive(input);
+            FileOutputStream outputStream = new FileOutputStream(path + fileName);
+            while (!clientMsg.equals("EOF")){
+                outputStream.write(clientMsg.getBytes());
+                clientMsg = receive(input);
+            }
+            System.out.println(fileName + " received from client");
+            outputStream.close();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     /**
@@ -107,8 +164,8 @@ public class ClientRequest extends Thread {
             Socket socket = new Socket(ipMaster, portMaster);
             DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
             BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            sendToMaster("GET " + fileName, outStream);
-            String masterMsg = getMasterMsg(inStream);
+            send("GET " + fileName, outStream);
+            String masterMsg = receive(inStream);
 
             if (masterMsg.equals("FNE")) { // if response of proxy is: File Not Exists
                 System.out.println(fileName + " doesn't exists on master");
@@ -119,7 +176,7 @@ public class ClientRequest extends Thread {
             FileOutputStream outputStream = new FileOutputStream(path + fileName);
             while (!masterMsg.equals("EOF")){
                 outputStream.write(masterMsg.getBytes());
-                masterMsg = getMasterMsg(inStream);
+                masterMsg = receive(inStream);
             }
             System.out.println(fileName + " received from master");
             outputStream.close();
@@ -136,15 +193,15 @@ public class ClientRequest extends Thread {
      * @param fileName
      * @param output
      */
-    private void sendFileToClient(String fileName, DataOutputStream output) {
+    private void sendFile(String fileName, DataOutputStream output) {
         FileInputStream serverFile;
         try {
             serverFile = new FileInputStream(path + fileName);
             byte[] buffer = new byte[1024];
             while (serverFile.read(buffer) != -1) {
-                sendToClient(new String(buffer), output);
+                send(new String(buffer), output);
             }
-            sendToClient("EOF", output);
+            send("EOF", output);
             serverFile.close();
 
         } catch (IOException e) {
@@ -161,27 +218,27 @@ public class ClientRequest extends Thread {
         try (BufferedReader br = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = br.readLine()) != null) {
-                sendToClient(line, output);
+                send(line, output);
             }
-            sendToClient("OK", output);
+            send("OK", output);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
     }
 
-    private boolean fileExistsOnMaster(String fileName) {
+    private boolean fileExistsOnConfig(String fileName) {
         try {
             // Note that we read the entire file assuming it will not be too big
             List<String> lines = Files.readAllLines(Paths.get(path + ".config/master_files.txt"), Charset.forName("UTF-8"));
             if (lines.contains(fileName)) {
-                System.out.println(fileName + " exists on master server");
+                System.out.println(fileName + " exists on configuration file");
                 return true;
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println(fileName + " doesn't exists on master server");
+        System.out.println(fileName + " doesn't exists on configuration file");
         return false;
     }
 
@@ -207,15 +264,12 @@ public class ClientRequest extends Thread {
      * @param msg    Message that will be sent
      * @param output Data output stream
      */
-    private void sendToClient(String msg, DataOutputStream output) {
+    private void send(String msg, DataOutputStream output) {
         try {
             output.writeBytes(msg + "\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-    private void sendToMaster(String s, DataOutputStream outStream) {
-        sendToClient(s, outStream);
     }
 
     /**
@@ -224,7 +278,7 @@ public class ClientRequest extends Thread {
      * @param input Reader
      * @return String message from client
      */
-    private String getClientMsg(BufferedReader input) {
+    private String receive(BufferedReader input) {
         String msg = "";
         try {
             msg = input.readLine();
@@ -234,7 +288,4 @@ public class ClientRequest extends Thread {
         return msg;
     }
 
-    private String getMasterMsg(BufferedReader input) {
-        return getClientMsg(input);
-    }
 }

@@ -40,19 +40,33 @@ public class Master {
                 Socket socket = serverSocket.accept();
                 DataOutputStream output = new DataOutputStream(socket.getOutputStream());
                 BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                saveProxyIp(socket.getRemoteSocketAddress().toString());
+                String ip = socket.getRemoteSocketAddress().toString().replace("/", "").split(":")[0];
+                saveProxyIp(ip);
 
-                String proxyMsg = getProxyMsg(input);
-                if (proxyMsg.equals("SINCRONIZE")) {
-                    sendListFilesToProxy(output);
+                String proxyMsg = receive(input);
+                System.out.println("Message received from a proxy: '" + proxyMsg + "'");
+                if (proxyMsg.equals("SYNC")) {
+                    sendListFiles(output);
                 } else {
                     String action = proxyMsg.split(" ")[0];
                     String fileName = proxyMsg.split(" ")[1];
                     if (action.equals("GET")) {
                         if (fileExists(fileName))
-                            sendFileToProxy(fileName, output);
+                            sendFile(fileName, output);
                         else {
-                            sendToProxy("FNE", output);
+                            send("FNE", output);
+                        }
+                    } else if (action.equals("PUT")) {
+                        if(fileExists(fileName)) {
+                            send("FYE", output);
+                        } else {
+                            send("FNE", output);
+                            receiveFile(fileName, input);
+                            if (updateProxysFiles()){
+                                send("OK", output);
+                            } else {
+                                send("FAIL", output);
+                            }
                         }
                     }
                     // ToDo: implement other responses
@@ -65,15 +79,54 @@ public class Master {
         }
     }
 
-    private void sendFileToProxy(String fileName, DataOutputStream output) {
+    private boolean updateProxysFiles() {
+        String ipsFilePath = path + ".config/ips.txt";
+        try {
+            // Note that we read the entire file assuming it will not be too big
+            List<String> proxys = Files.readAllLines(Paths.get(ipsFilePath), Charset.forName("UTF-8"));
+            for (String ip : proxys) {
+                Socket socket = new Socket(ip, portProxyMaster);
+                DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+                BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                send("SYNC", outStream);
+                sendListFiles(outStream);
+                String proxyMsg = receive(inStream);
+                socket.close();
+                if (!proxyMsg.equals("OK")){
+                    return false;
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private void receiveFile(String fileName, BufferedReader input) {
+        try {
+            String proxyMsg = receive(input);
+            FileOutputStream outputStream = new FileOutputStream(path + fileName);
+            while (!proxyMsg.equals("EOF")){
+                outputStream.write(proxyMsg.getBytes());
+                proxyMsg = receive(input);
+            }
+            System.out.println(fileName + " received from proxy");
+            outputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendFile(String fileName, DataOutputStream output) {
         FileInputStream serverFile;
         try {
             serverFile = new FileInputStream(path + fileName);
             byte[] buffer = new byte[1024];
             while (serverFile.read(buffer) != -1) {
-                sendToProxy(new String(buffer), output);
+                send(new String(buffer), output);
             }
-            sendToProxy("EOF", output);
+            send("EOF", output);
             serverFile.close();
 
         } catch (IOException e) {
@@ -86,20 +139,20 @@ public class Master {
         return file.exists();
     }
 
-    private void sendListFilesToProxy(DataOutputStream output) {
+    private void sendListFiles(DataOutputStream output) {
         File folder = new File(path);
         for (File fileEntry : folder.listFiles()) {
             if (fileEntry.isFile())
-                sendToProxy(fileEntry.getName(), output);
+                send(fileEntry.getName(), output);
         }
-        sendToProxy("OK", output);
+        send("OK", output);
     }
 
     /**
      * Save the proxy ip on a config file
-     * @param ipProxyWithPort
+     * @param ipProxy
      */
-    private void saveProxyIp(String ipProxyWithPort) {
+    private void saveProxyIp(String ipProxy) {
         // Creation of config dir
         File masterConfig = new File(path + ".config");
         if (masterConfig.exists()){
@@ -125,7 +178,6 @@ public class Master {
                 e.printStackTrace();
             }
         }
-        String ipProxy = ipProxyWithPort.replace("/", "").split(":")[0];
         try {
             // Note that we read the entire file assuming it will not be too big
             List<String> lines = Files.readAllLines(Paths.get(ipsFilePath), Charset.forName("UTF-8"));
@@ -143,7 +195,7 @@ public class Master {
      * @param msg    Message that will be sent
      * @param output Data output stream
      */
-    private void sendToProxy(String msg, DataOutputStream output) {
+    private void send(String msg, DataOutputStream output) {
         try {
             output.writeBytes(msg + "\n");
         } catch (IOException e) {
@@ -157,7 +209,7 @@ public class Master {
      * @param input Reader
      * @return String message from client
      */
-    private String getProxyMsg(BufferedReader input) {
+    private String receive(BufferedReader input) {
         String msg = "";
         try {
             msg = input.readLine();
