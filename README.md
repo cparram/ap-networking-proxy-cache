@@ -7,10 +7,13 @@ Proxy cache implementation
 ### Build
 * `$ ./gradlew buildClientJar`: Creates a jar for client source set
 * `$ ./gradlew buildNodeJar`: Creates a jar for node source set
+* `$ ./gradlew buildMasterJar`: Creates a jar for master source set
 
-### Run proxy server daemon
-You must export a system variable called `$PATH_TO_PROXY` where are the server files cache
+### Daemons
+**You must create your own config.sh file**
+
 * `./proxy-node.sh [start|stop|restart]`
+* `./proxy-master.sh [start|stop|restart]`
 
 ### Run Client
 * `java -jar build/libs/proxy-cache-client-<version>.jar [command [file]] [options]`
