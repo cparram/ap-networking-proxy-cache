@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-SERVICE_NAME="Master node"
-PATH_TO_JAR=build/libs/proxy-cache-master-0.1.0.jar
-PID_PATH_NAME=build/tmp/master-pid
-
 my_dir="$(dirname "$0")"
 source "$my_dir/config.sh"
+SERVICE_NAME="Master node"
+PATH_TO_JAR="$my_dir/build/libs/proxy-cache-master-0.1.0.jar"
+PID_PATH_NAME="$my_dir/build/tmp/master-pid"
 
 case $1 in
     start)

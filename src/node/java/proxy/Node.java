@@ -40,7 +40,7 @@ public class Node {
      * Creates a thread that listen requests from client.
      */
     private void listenClientRequests() {
-        (new ClientRequest(portProxyClient, path)).start();
+        (new ClientRequest(portProxyClient, path, ipMaster, portMaster)).start();
     }
 
 

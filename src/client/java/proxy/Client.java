@@ -96,7 +96,7 @@ public class Client {
                 outputStream.write(proxyMsg.getBytes());
                 proxyMsg = getProxyServerMsg(inStream);
             }
-            System.out.println("OK");
+            System.out.println("File received");
             outputStream.close();
         } catch (IOException e) {
             e.printStackTrace();

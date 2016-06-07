@@ -3,6 +3,12 @@ package proxy;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
 
 /**
  * Created by cesar on 07-06-16.
@@ -10,10 +16,14 @@ import java.net.Socket;
 public class ClientRequest extends Thread {
     private final String path;
     private final int port;
+    private final String ipMaster;
+    private final int portMaster;
 
-    public ClientRequest(int port, String path) {
+    public ClientRequest(int port, String path, String ipMaster, int portMaster) {
         this.port = port;
         this.path = path;
+        this.ipMaster = ipMaster;
+        this.portMaster = portMaster;
     }
 
     @Override
@@ -33,11 +43,15 @@ public class ClientRequest extends Thread {
                     if (action.equals("GET")) {
                         if (fileExists(fileName))
                             sendFileToClient(fileName, output);
-                        else {
-                            // ToDo: get file from master
-                            // and response to client
+                        else if (fileExistsOnMaster(fileName)) {
+                            if (getFileFromMaster(fileName)){
+                                sendFileToClient(fileName, output);
+                            } else {
+                                removeFileName(fileName);
+                                sendToClient("FNE", output);
+                            }
+                        } else
                             sendToClient("FNE", output);
-                        }
                     }
                     // ToDo: implement other responses
                     // else if (action.equals("PUT")) {
@@ -60,6 +74,68 @@ public class ClientRequest extends Thread {
         }
     }
 
+    /**
+     * Removes file name of config file
+     * @param fileName
+     */
+    private void removeFileName(String fileName) {
+        Path masterFile = Paths.get(path + ".config/master_files.txt");
+        try {
+            // Note that
+            // we read the entire file assuming it will not be too big
+            List<String> lines = Files.readAllLines(masterFile, Charset.forName("UTF-8"));
+            lines.remove(fileName);
+
+            // delete file and create new one
+            masterFile.toFile().delete();
+            masterFile.toFile().createNewFile();
+            for (String line : lines) {
+                Files.write(masterFile, (line + "\n").getBytes(), StandardOpenOption.APPEND);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Creates a new socket to request a file to Master
+     * @param fileName
+     * @return
+     */
+    private boolean getFileFromMaster(String fileName) {
+        try {
+            Socket socket = new Socket(ipMaster, portMaster);
+            DataOutputStream outStream = new DataOutputStream(socket.getOutputStream());
+            BufferedReader inStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            sendToMaster("GET " + fileName, outStream);
+            String masterMsg = getMasterMsg(inStream);
+
+            if (masterMsg.equals("FNE")) { // if response of proxy is: File Not Exists
+                System.out.println(fileName + " doesn't exists on master");
+                socket.close();
+                return false;
+            }
+
+            FileOutputStream outputStream = new FileOutputStream(path + fileName);
+            while (!masterMsg.equals("EOF")){
+                outputStream.write(masterMsg.getBytes());
+                masterMsg = getMasterMsg(inStream);
+            }
+            System.out.println(fileName + " received from master");
+            outputStream.close();
+            socket.close();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Sends a file to the client
+     * @param fileName
+     * @param output
+     */
     private void sendFileToClient(String fileName, DataOutputStream output) {
         FileInputStream serverFile;
         try {
@@ -94,6 +170,21 @@ public class ClientRequest extends Thread {
 
     }
 
+    private boolean fileExistsOnMaster(String fileName) {
+        try {
+            // Note that we read the entire file assuming it will not be too big
+            List<String> lines = Files.readAllLines(Paths.get(path + ".config/master_files.txt"), Charset.forName("UTF-8"));
+            if (lines.contains(fileName)) {
+                System.out.println(fileName + " exists on master server");
+                return true;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println(fileName + " doesn't exists on master server");
+        return false;
+    }
+
     /**
      * Checks if a file exists or not.
      * @param fileName
@@ -101,7 +192,13 @@ public class ClientRequest extends Thread {
      */
     private boolean fileExists(String fileName) {
         File file = new File(path + fileName);
-        return file.exists();
+        if (file.exists()) {
+            System.out.println(fileName + " exists on proxy server");
+            return true;
+        } else {
+            System.out.println(fileName + " doesn't exists on proxy server");
+            return false;
+        }
     }
 
     /**
@@ -116,6 +213,9 @@ public class ClientRequest extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+    private void sendToMaster(String s, DataOutputStream outStream) {
+        sendToClient(s, outStream);
     }
 
     /**
@@ -132,5 +232,9 @@ public class ClientRequest extends Thread {
             e.printStackTrace();
         }
         return msg;
+    }
+
+    private String getMasterMsg(BufferedReader input) {
+        return getClientMsg(input);
     }
 }

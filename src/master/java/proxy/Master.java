@@ -7,9 +7,11 @@ import org.kohsuke.args4j.Option;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 
 /**
  * Created by cesar on 07-06-16.
@@ -44,13 +46,44 @@ public class Master {
                 if (proxyMsg.equals("SINCRONIZE")) {
                     sendListFilesToProxy(output);
                 } else {
+                    String action = proxyMsg.split(" ")[0];
+                    String fileName = proxyMsg.split(" ")[1];
+                    if (action.equals("GET")) {
+                        if (fileExists(fileName))
+                            sendFileToProxy(fileName, output);
+                        else {
+                            sendToProxy("FNE", output);
+                        }
+                    }
                     // ToDo: implement other responses
                 }
+                socket.close();
             }
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
+    }
+
+    private void sendFileToProxy(String fileName, DataOutputStream output) {
+        FileInputStream serverFile;
+        try {
+            serverFile = new FileInputStream(path + fileName);
+            byte[] buffer = new byte[1024];
+            while (serverFile.read(buffer) != -1) {
+                sendToProxy(new String(buffer), output);
+            }
+            sendToProxy("EOF", output);
+            serverFile.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean fileExists(String fileName) {
+        File file = new File(path + fileName);
+        return file.exists();
     }
 
     private void sendListFilesToProxy(DataOutputStream output) {
@@ -79,7 +112,9 @@ public class Master {
             }
         }
 
+
         String ipsFilePath = path + ".config/ips.txt";
+        // It ensures the existence of the file ips
         File ipsFile = new File(ipsFilePath);
         if (!ipsFile.exists()){
             try {
@@ -90,24 +125,16 @@ public class Master {
                 e.printStackTrace();
             }
         }
-        String ipProxy = ipProxyWithPort.split(":")[0];
+        String ipProxy = ipProxyWithPort.replace("/", "").split(":")[0];
         try {
-            String content = new String(Files.readAllBytes(Paths.get(ipsFilePath)));
-            boolean included = false;
-            for (String ip: content.split("/") ) {
-                if (ip.equals(ipProxy.replace("/", "")))
-                    included = true;
-            }
-            if (!included) {
-                Files.write(Paths.get(ipsFilePath), ipProxy.getBytes(), StandardOpenOption.APPEND);
+            // Note that we read the entire file assuming it will not be too big
+            List<String> lines = Files.readAllLines(Paths.get(ipsFilePath), Charset.forName("UTF-8"));
+            if (!lines.contains(ipProxy)) {
+                Files.write(Paths.get(ipsFilePath), (ipProxy + "\n").getBytes(), StandardOpenOption.APPEND);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
-
-
     }
 
     /**
