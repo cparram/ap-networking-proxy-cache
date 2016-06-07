@@ -1,0 +1,12 @@
+language: java
+jdk:
+ - oraclejdk7
+ - openjdk7
+
+before_install:
+ - chmod +x gradlew
+
+script:
+ - ./gradlew buildClientJar
+ - ./gradlew buildNodeJar
+ - ./gradlew buildMasterJar

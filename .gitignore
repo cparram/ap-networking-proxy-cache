@@ -1,5 +1,7 @@
 .gradle
 build/
+.idea/
+config.sh
 
 # Ignore Gradle GUI config
 gradle-app.setting
