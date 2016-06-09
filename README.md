@@ -19,6 +19,7 @@ Projecto with Academic Purpose about Proxy cache implementation.
 ### Assumptions
 * The port used to listen nodes will be the master consultations 8181 which can not be used for other purposes
 * Is used configuration files used in each node to store the file list (if it is a proxy) and store ips of synchronized proxies (if master). These files are small
+* It is not accepted that upload files with the same name.
 
 ### Vagrant
 For testing purposes vagrant file is created for creating virtual machines:
