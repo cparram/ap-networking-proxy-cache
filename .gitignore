@@ -2,6 +2,10 @@
 build/
 .idea/
 config.sh
+topology.properties
+/.vagrant/
+/cookbooks/
+/tmp/
 
 # Ignore Gradle GUI config
 gradle-app.setting
