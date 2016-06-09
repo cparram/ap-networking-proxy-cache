@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/cparram/ap-networking-proxy-cache.svg?branch=staging)](https://travis-ci.org/cparram/ap-networking-proxy-cache)
 
 # ap-networking-proxy-cache
-Projecto with Academic Purpose about Proxy cache implementation.
+Project with Academic Purpose about Proxy cache implementation.
 
 ## Usage
 ### Build
