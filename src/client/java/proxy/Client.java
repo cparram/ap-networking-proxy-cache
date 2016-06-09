@@ -49,6 +49,7 @@ public class Client {
                         send(command + " " + fileName , outStream);
                         sendFile(fileName, outStream, inStream);
                     } else {
+                        send("FIN CON", outStream);
                         System.out.println(fileName + " doesn't exists");
                     }
                 } else if (command.equals("DELETE")) {
