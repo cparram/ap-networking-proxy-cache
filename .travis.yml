@@ -9,4 +9,3 @@ before_install:
 script:
  - ./gradlew buildClientJar
  - ./gradlew buildNodeJar
- - ./gradlew buildMasterJar
